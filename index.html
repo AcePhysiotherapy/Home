@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physio Enlight - Expert Home Physiotherapy</title>
+    
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        /* --- MAIN SITE STYLES --- */
+        body { font-family: 'Inter', sans-serif; }
+        .service-card { transition: all 0.3s ease; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+        .service-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); }
+        .modal { backdrop-filter: blur(5px); }
+        
+        /* Policy Content Styles */
+        .policy-content h4 { font-weight: 800; color: #374151; margin-top: 1.5rem; margin-bottom: 0.5rem; font-size: 1.1rem; }
+        .policy-content h5 { font-weight: 700; color: #4b5563; margin-top: 1rem; margin-bottom: 0.25rem; font-size: 1rem; }
+        .policy-content p { margin-bottom: 0.8rem; color: #4b5563; line-height: 1.6; }
+        .policy-content ul { list-style: disc; margin-left: 1.5rem; margin-bottom: 1rem; color: #4b5563; }
+        .policy-content li { margin-bottom: 0.3rem; }
+
+        /* Animation for Page Switching */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- CALENDAR SYSTEM STYLES --- */
+        :root { --cal-primary: #2c3e50; --cal-available: #27ae60; --cal-booked: #95a5a6; }
+        
+        .calendar-container h2 { text-align: center; color: #333; margin-bottom: 5px; font-size: 1.8rem; font-weight: 800; }
+        .calendar-container p.instruct { text-align: center; color: #666; font-size: 0.9rem; margin-top: 0; margin-bottom: 20px; }
+
+        .top-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        button.nav-btn { padding: 10px 20px; border: none; background: var(--cal-primary); color: white; border-radius: 8px; font-size: 0.9rem; cursor: pointer; transition: background 0.2s; }
+        button.nav-btn:hover { opacity: 0.9; }
+        
+        /* CALENDAR GRID */
+        .scroll-container { overflow-x: auto; padding-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .calendar-wrapper { 
+            display: grid; 
+            grid-template-columns: 80px repeat(6, 1fr); 
+            background: white; border: 1px solid #e5e7eb; border-radius: 8px; 
+            min-width: 800px; /* Ensures grid doesn't squash on mobile */
+        }
+
+        .header-cell { background: var(--cal-primary); color: white; padding: 15px 5px; text-align: center; font-weight: bold; font-size: 0.9rem; }
+        .time-cell { background: #f9fafb; font-weight: bold; display: flex; justify-content: center; align-items: center; border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; font-size: 0.8rem; color: #4b5563; }
+        .is-today { border-bottom: 4px solid #e67e22; }
+
+        /* SLOT STYLES */
+        .slot { 
+            height: 60px; 
+            border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 0.85rem; cursor: pointer; transition: 0.2s;
+        }
+        .slot.available { background-color: #ecfdf5; color: var(--cal-available); font-weight: bold; }
+        .slot.available:hover { background-color: #d1fae5; transform: scale(0.98); }
+        .slot.taken { background-color: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+
+        /* BOOKING MODAL (Calendar Specific) */
+        .cal-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .cal-modal-box {
+            background: white; padding: 30px; border-radius: 16px;
+            width: 90%; max-width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            text-align: center;
+        }
+        .cal-modal-title { font-size: 1.5rem; font-weight: bold; color: var(--cal-primary); margin-bottom: 5px; }
+        .cal-modal-subtitle { font-size: 1rem; color: #6b7280; margin-bottom: 25px; }
+
+        input.cal-modal-input {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px;
+            box-sizing: border-box; outline: none; transition: border 0.2s;
+        }
+        input.cal-modal-input:focus { border-color: var(--cal-available); ring: 2px; }
+
+        .cal-modal-actions { display: flex; gap: 10px; margin-top: 10px; }
+        button.btn-confirm { flex: 1; padding: 12px; background: var(--cal-available); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+        button.btn-confirm:hover { background-color: #219150; }
+        button.btn-cancel { flex: 1; padding: 12px; background: #9ca3af; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+        button.btn-cancel:hover { background-color: #6b7280; }
+
+        /* Toast Notification */
+        #toast {
+            visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 2000; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 17px;
+        }
+        #toast.show { visibility: visible; -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- ======================= 
+         MAIN WEBSITE VIEW 
+    ======================== -->
+    <div id="main-view" class="transition-opacity duration-300">
+        
+        <!-- Header -->
+        <header class="sticky top-0 z-50 bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <a href="#hero" class="text-2xl font-extrabold text-indigo-700 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    Physio Enlight
+                </a>
+                <nav class="hidden sm:flex items-center space-x-6">
+                    <a href="#services" class="text-gray-600 hover:text-indigo-700 font-medium transition duration-150">Our Service</a>
+                    <a href="#packages" class="text-gray-600 hover:text-indigo-700 font-medium transition duration-150">Pricing</a>
+                    <a href="#contact" class="text-gray-600 hover:text-indigo-700 font-medium transition duration-150">Contact Us</a>
+                    <button onclick="openBookingPage()" class="px-5 py-2 bg-green-500 text-white font-semibold rounded-full shadow-md hover:bg-green-600 transition duration-300">
+                        Book a Session
+                    </button>
+                </nav>
+                <button class="sm:hidden px-4 py-2 bg-green-500 text-white font-semibold text-sm rounded-full hover:bg-green-600" onclick="openBookingPage()">
+                    Book Now
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <!-- Hero Section -->
+            <section id="hero" class="py-20 md:py-32 bg-indigo-50">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <span class="text-sm font-semibold text-indigo-600 uppercase tracking-wider mb-2 block">Specialized Home Care</span>
+                        <h1 class="text-5xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-4">
+                            Expert Physiotherapy, <span class="text-indigo-700">In the Comfort of Home.</span>
+                        </h1>
+                        <p class="text-xl text-gray-600 mb-8">
+                            Get personalized rehabilitation, pain management, and mobility treatment from certified therapists at your doorstep.
+                        </p>
+                        <button class="px-8 py-4 text-xl font-bold text-white bg-red-500 rounded-lg shadow-xl hover:bg-red-600 transition duration-300 transform hover:scale-105" onclick="openBookingPage()">
+                            Book Your First Session
+                        </button>
+                    </div>
+                    <div class="hidden lg:block">
+                        <img src="https://placehold.co/600x400/5b21b6/ffffff?text=Physiotherapy+At+Home" alt="Physiotherapy" class="rounded-xl shadow-2xl" onerror="this.src='https://placehold.co/600x400/5b21b6/ffffff?text=Physiotherapy+At+Home';">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Services Section -->
+            <section id="services" class="py-16 md:py-20 bg-white">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <h2 class="text-4xl font-extrabold text-center text-gray-900 mb-4">Our Core Physiotherapy Services</h2>
+                    <p class="text-center text-lg text-gray-600 mb-12">We offer specialized treatment for various conditions, ensuring a full recovery.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        
+                        <!-- 1. Sports Rehabilitation (Top Priority) -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-orange-500">
+                            <div class="text-4xl mb-4">🏃‍♂️</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Sports Rehabilitation</h3>
+                            <p class="text-gray-600 text-sm">Advanced recovery programs for athletes. We treat ACL tears, ligament strains, rotator cuff injuries, and ensure a safe return to sport.</p>
+                        </div>
+
+                        <!-- 2. Orthopaedic Physiotherapy -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-500">
+                            <div class="text-4xl mb-4">🦴</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Orthopaedic Physio</h3>
+                            <p class="text-gray-600 text-sm">Expert care for bone and joint conditions including arthritis, fractures, spondylitis, and joint replacements.</p>
+                        </div>
+
+                        <!-- 3. Pre & Post Surgery Rehab -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-500">
+                            <div class="text-4xl mb-4">🏥</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Pre/Post Surgery Rehab</h3>
+                            <p class="text-gray-600 text-sm">Pre-hab to strengthen before surgery and Post-hab to restore mobility and function after operations.</p>
+                        </div>
+
+                        <!-- 4. Neurological Rehabilitation -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-green-500">
+                            <div class="text-4xl mb-4">🧠</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Neuro Rehabilitation</h3>
+                            <p class="text-gray-600 text-sm">Specialized therapy for Stroke, Parkinson’s, Spinal Cord Injuries, and balance disorders to improve independence.</p>
+                        </div>
+
+                        <!-- 5. Chronic Pain Management -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-red-500">
+                            <div class="text-4xl mb-4">💆</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Pain Management</h3>
+                            <p class="text-gray-600 text-sm">Targeted therapy for chronic back pain, neck stiffness, sciatica, and frozen shoulder using manual therapy.</p>
+                        </div>
+
+                        <!-- 6. Exercise and Fitness -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-teal-500">
+                            <div class="text-4xl mb-4">🏋️‍♀️</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Exercise & Fitness</h3>
+                            <p class="text-gray-600 text-sm">Personalized strength and conditioning protocols to improve posture, core stability, and overall physical health.</p>
+                        </div>
+
+                        <!-- 7. Dry Needling -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-purple-500">
+                            <div class="text-4xl mb-4">📍</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Dry Needling</h3>
+                            <p class="text-gray-600 text-sm">A modern technique using thin needles to release trigger points, relieve muscle knots, and reduce chronic pain.</p>
+                        </div>
+
+                        <!-- 8. Cupping Therapy -->
+                        <div class="service-card bg-white p-6 rounded-xl shadow-md border-t-4 border-yellow-500">
+                            <div class="text-4xl mb-4">🏺</div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Cupping Therapy</h3>
+                            <p class="text-gray-600 text-sm">Ancient therapy using suction cups to improve blood flow, reduce inflammation, and promote deep tissue relaxation.</p>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <!-- Packages -->
+            <section id="packages" class="py-16 md:py-20 bg-gray-50">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <h2 class="text-4xl font-extrabold text-center text-gray-900 mb-12">Session Pricing</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <div class="bg-white p-8 rounded-xl shadow-2xl border-2 border-gray-100 text-center">
+                            <h4 class="text-2xl font-bold text-gray-900 mb-2">Basic Session (30 Min)</h4>
+                            <p class="text-gray-500 mb-4">Focused on routine maintenance.</p>
+                            <p class="text-5xl font-extrabold text-indigo-700 mb-6">₹1,000<span class="text-lg font-normal text-gray-500">/session</span></p>
+                            <button class="w-full py-3 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600" onclick="openBookingPage('Basic Session')">Book Basic</button>
+                        </div>
+                        <div class="bg-indigo-700 p-8 rounded-xl shadow-2xl text-white text-center border-4 border-yellow-400 transform scale-[1.05]">
+                            <p class="text-sm font-bold text-yellow-400 mb-2 uppercase">Recommended</p>
+                            <h4 class="text-2xl font-bold mb-2">Premium Session (60 Min)</h4>
+                            <p class="text-blue-200 mb-4">Best for intensive recovery.</p>
+                            <p class="text-6xl font-extrabold mb-6">₹2,000<span class="text-xl font-normal">/session</span></p>
+                            <button class="w-full py-3 bg-yellow-400 text-indigo-900 font-bold rounded-lg hover:bg-yellow-500" onclick="openBookingPage('Premium Session')">Go With Premium</button>
+                        </div>
+                        <div class="bg-white p-8 rounded-xl shadow-2xl border-2 border-gray-100 text-center">
+                            <h4 class="text-2xl font-bold text-gray-900 mb-2">Intensive 5-Session Pack</h4>
+                            <p class="text-gray-500 mb-4">Commit to recovery and save.</p>
+                            <p class="text-5xl font-extrabold text-indigo-700 mb-6">₹8,500<span class="text-lg font-normal text-gray-500">/pack</span></p>
+                            <button class="w-full py-3 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600" onclick="openBookingPage('Intensive Package')">Buy Package</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Contact -->
+            <section id="contact" class="py-16 md:py-20 bg-indigo-700">
+                <div class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
+                    <h2 class="text-4xl font-extrabold mb-6">Contact Us Directly</h2>
+                    <p class="text-lg text-indigo-200 mb-8">Reach out via phone or email for immediate assistance.</p>
+                    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl space-y-6">
+                        <div class="flex items-center justify-center space-x-4">
+                            <div><p class="text-sm text-indigo-300">Call/WhatsApp</p><a href="tel:+917005581380" class="text-2xl font-bold hover:text-white transition">+91 70055 81380</a></div>
+                        </div>
+                        <div class="flex items-center justify-center space-x-4">
+                            <div><p class="text-sm text-indigo-300">Email Inquiry</p><a href="mailto:apurbadeb15@gmail.com" class="text-lg font-bold hover:text-white transition">apurbadeb15@gmail.com</a></div>
+                        </div>
+                        <div class="flex items-center justify-center space-x-4 text-center">
+                            <div>
+                                <p class="text-sm text-indigo-300">Location</p>
+                                <p class="text-lg font-bold text-white">Sector 39, Gurugram, Haryana</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-white py-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                    <div>
+                        <h5 class="text-xl font-extrabold text-indigo-400 mb-3">Physio Enlight</h5>
+                        <p class="text-sm text-gray-400">Bringing professional physiotherapy to your home.</p>
+                        <p class="text-xs text-gray-500 mt-2">Sector 39, Gurugram, Haryana</p>
+                    </div>
+                    <div>
+                        <h5 class="font-semibold mb-3 text-gray-200">Policies</h5>
+                        <ul class="space-y-2 text-sm">
+                            <li><button data-policy="privacy" class="text-gray-400 hover:text-white transition">Privacy Policy</button></li>
+                            <li><button data-policy="refund" class="text-gray-400 hover:text-white transition">Refund Policy</button></li>
+                            <li><button data-policy="disclaimer" class="text-gray-400 hover:text-white transition">Disclaimer</button></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+
+    <!-- ======================= 
+         NEW BOOKING WINDOW PAGE (Firebase Calendar) 
+    ======================== -->
+    <div id="booking-page" class="hidden fixed inset-0 bg-white z-[100] overflow-y-auto fade-in">
+        
+        <!-- Navbar for Booking Page -->
+        <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex justify-between items-center z-20 shadow-sm">
+            <button onclick="closeBookingPage()" class="flex items-center text-gray-600 hover:text-indigo-700 font-semibold transition">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Back to Home
+            </button>
+            <span class="text-lg font-bold text-indigo-700">Book Appointment</span>
+            <div class="w-20"></div> <!-- Spacer for centering -->
+        </div>
+
+        <!-- Calendar Container -->
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 calendar-container">
+            <h2>Physiotherapy Booking</h2>
+            <p class="instruct">Tap a green slot to book an appointment.</p>
+            <p id="package-note" class="text-center text-sm text-indigo-600 font-semibold mb-4 hidden">You are booking for: <span id="selected-package-name"></span></p>
+
+            <div class="top-bar">
+                <button class="nav-btn" onclick="changeWeek(-7)">&#8592; Prev</button>
+                <button class="nav-btn" style="background:#e67e22" onclick="goToToday()">Today</button>
+                <button class="nav-btn" onclick="changeWeek(7)">Next &#8594;</button>
+            </div>
+
+            <div class="scroll-container">
+                <div class="calendar-wrapper" id="calendarGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CALENDAR BOOKING CONFIRMATION MODAL -->
+    <div class="cal-modal-overlay" id="bookingModal">
+        <div class="cal-modal-box">
+            <div class="cal-modal-title">Confirm Booking</div>
+            <div class="cal-modal-subtitle" id="modalTimeText">Time: ...</div>
+            
+            <input type="text" id="pName" class="cal-modal-input" placeholder="Your Full Name">
+            <input type="tel" id="pPhone" class="cal-modal-input" placeholder="Phone Number">
+            
+            <div class="cal-modal-actions">
+                <button class="btn-cancel" onclick="closeCalModal()">Cancel</button>
+                <button class="btn-confirm" onclick="confirmBooking()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast">Message here...</div>
+    
+    <!-- ======================= 
+         FULL LEGAL POLICY MODALS 
+    ======================== -->
+
+    <!-- 1. Privacy Policy Modal -->
+    <div id="privacy-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-[9999] overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl p-6 md:p-10 relative">
+                <button data-close-modal="privacy" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-3xl font-bold text-indigo-700 mb-6">Privacy Policy</h3>
+                <div class="policy-content text-gray-700 max-h-[70vh] overflow-y-auto pr-2">
+                    <p>At Physio Enlight we are committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our website Physio Enlight.</p>
+
+                    <h4>Information We Collect</h4>
+                    
+                    <h5>A. Personal Information</h5>
+                    <p>We may collect the following:</p>
+                    <ul>
+                        <li>Name</li>
+                        <li>Email address</li>
+                        <li>Phone number</li>
+                        <li>Address</li>
+                        <li>Appointment details</li>
+                        <li>Any medical information voluntarily shared</li>
+                    </ul>
+
+                    <h5>B. Non-Personal Information</h5>
+                    <ul>
+                        <li>Device and browser type</li>
+                        <li>IP address</li>
+                        <li>Pages visited</li>
+                        <li>Time spent on the website</li>
+                        <li>Cookies and tracking information</li>
+                    </ul>
+
+                    <h4>How We Use Your Information</h4>
+                    <p>We use your information to:</p>
+                    <ul>
+                        <li>Provide physiotherapy and wellness services</li>
+                        <li>Manage appointments</li>
+                        <li>Respond to inquiries</li>
+                        <li>Improve website quality and user experience</li>
+                        <li>Maintain client records</li>
+                        <li>Comply with medical, ethical, and legal requirements</li>
+                    </ul>
+
+                    <h4>How We Share Your Information</h4>
+                    <p>We do not sell your personal data. We may share your information with:</p>
+                    <ul>
+                        <li>Authorized clinic staff</li>
+                        <li>Third-party service providers (hosting, analytics, SMS OTP, etc.)</li>
+                        <li>Legal authorities when required by law</li>
+                    </ul>
+
+                    <h4>Cookies</h4>
+                    <p>We use cookies to enhance your website experience. You may disable cookies in your browser settings; however, some site features may stop working properly.</p>
+
+                    <h4>Data Security</h4>
+                    <p>We take reasonable security steps to protect your data from unauthorized access, modification, or misuse. However, no online system is 100% secure.</p>
+
+                    <h4>Your Rights</h4>
+                    <p>You may request:</p>
+                    <ul>
+                        <li>Access to your personal data</li>
+                        <li>Corrections or updates</li>
+                        <li>Deletion of your records</li>
+                        <li>Withdrawal of consent</li>
+                    </ul>
+                    <p>To exercise these rights, contact us at: <a href="mailto:apurbadeb15@gmail.com" class="text-indigo-600 hover:underline">apurbadeb15@gmail.com</a></p>
+
+                    <h4>Medical Information Disclaimer</h4>
+                    <p>All health content is for educational purposes only and is not a substitute for professional medical advice.</p>
+
+                    <h4>Third-Party Links</h4>
+                    <p>Our website may contain links to external websites. We are not responsible for their content or privacy policies.</p>
+
+                    <h4>Children’s Privacy</h4>
+                    <p>We do not knowingly collect information from children under 16 without parental consent.</p>
+
+                    <h4>Changes to This Policy</h4>
+                    <p>We may update this policy anytime. Updates will be posted on this page.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 2. Refund Policy Modal -->
+    <div id="refund-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-[9999] overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl p-6 md:p-10 relative">
+                <button data-close-modal="refund" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-3xl font-bold text-indigo-700 mb-6">No Refund – Rescheduling Only Policy</h3>
+                <div class="policy-content text-gray-700 max-h-[70vh] overflow-y-auto pr-2">
+                    <p>At Physio Enlight, we maintain a strict no refund policy for all physiotherapy services, appointments, and packages. This ensures smooth scheduling and fairness for all clients.</p>
+
+                    <h4>1. No Refund Policy</h4>
+                    <ul>
+                        <li>All payments are non-refundable.</li>
+                        <li>This applies to single sessions, follow-ups, assessments, and multi-session packages.</li>
+                    </ul>
+
+                    <h4>2. Rescheduling Policy</h4>
+                    <h5>A. Rescheduling Allowed (Before 24 Hours)</h5>
+                    <ul>
+                        <li>Clients may reschedule their appointment at least 24 hours before the scheduled time.</li>
+                        <li>Only one complimentary reschedule is permitted per session.</li>
+                        <li>The rescheduled session must be booked within 30 days of the original date.</li>
+                    </ul>
+
+                    <h5>B. Rescheduling Not Allowed (Within 24 Hours)</h5>
+                    <ul>
+                        <li>If the client cancels, reschedules, or misses their appointment within 24 hours:</li>
+                        <li>The session will be marked as used.</li>
+                        <li>No reschedule or refund will be provided.</li>
+                    </ul>
+
+                    <h4>3. No-Show Policy</h4>
+                    <ul>
+                        <li>If a client does not attend the session and gives no prior notice:</li>
+                        <li>The session is forfeited.</li>
+                        <li>No reschedule or refund will be given.</li>
+                    </ul>
+
+                    <h4>4. Packages / Multi-Session Plans</h4>
+                    <ul>
+                        <li>All packages are strictly non-refundable.</li>
+                        <li>Sessions missed within 24 hours are counted as completed.</li>
+                        <li>Packages cannot be transferred to another person without clinic approval.</li>
+                    </ul>
+
+                    <h4>5. Clinic-Initiated Rescheduling</h4>
+                    <ul>
+                        <li>If the clinic must reschedule due to therapist unavailability or emergencies:</li>
+                        <li>A free reschedule will be offered at the earliest available slot.</li>
+                        <li>No refund applies.</li>
+                    </ul>
+
+                    <h4>6. Contact for Appointment Changes</h4>
+                    <p>📧 Email: <a href="mailto:apurbadeb15@gmail.com" class="text-indigo-600 font-bold">apurbadeb15@gmail.com</a></p>
+                    <p>📞 Phone: <a href="tel:+917005581380" class="text-indigo-600 font-bold">+91 70055 81380</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3. Disclaimer Modal -->
+    <div id="disclaimer-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-[9999] overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl p-6 md:p-10 relative">
+                <button data-close-modal="disclaimer" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-3xl font-bold text-indigo-700 mb-6">Disclaimer</h3>
+                <div class="policy-content text-gray-700 max-h-[70vh] overflow-y-auto pr-2">
+                    <h4>General Information</h4>
+                    <p>All information provided on Physio Enlight website is for general educational purposes only.</p>
+
+                    <h4>Not a Substitute for Medical Advice</h4>
+                    <p>The content on this website:</p>
+                    <ul>
+                        <li>Does not constitute medical advice</li>
+                        <li>Should not replace a professional physiotherapy consultation</li>
+                    </ul>
+                    <p>Always consult a licensed physiotherapist or healthcare provider for personalized medical guidance which we provide physically with our team.</p>
+
+                    <h4>Accuracy of Information</h4>
+                    <p>While we strive to provide accurate and updated content, we make no warranties regarding:</p>
+                    <ul>
+                        <li>Accuracy</li>
+                        <li>Completeness</li>
+                        <li>Reliability</li>
+                    </ul>
+                    <p>We are not responsible for any injury, loss, or damage resulting from the use of information on this website.</p>
+
+                    <h4>Individual Results May Vary</h4>
+                    <p>Treatment outcomes depend on:</p>
+                    <ul>
+                        <li>Individual conditions</li>
+                        <li>Lifestyle</li>
+                        <li>Treatment adherence</li>
+                    </ul>
+                    <p>Therefore, results cannot be guaranteed.</p>
+
+                    <h4>External Links</h4>
+                    <p>Our website may link to external sites. We are not responsible for their content or policies.</p>
+
+                    <h4>Emergency Situations</h4>
+                    <p>If you have severe pain, sudden symptoms, or an emergency:</p>
+                    <ul>
+                        <li>Immediately seek hospital or emergency medical care.</li>
+                    </ul>
+                    <p>This website does not provide emergency medical guidance.</p>
+
+                    <h4>Contact</h4>
+                    <p>📧 Email: <a href="mailto:apurbadeb15@gmail.com" class="text-indigo-600 font-bold">apurbadeb15@gmail.com</a></p>
+                    <p>📞 Phone: <a href="tel:+917005581380" class="text-indigo-600 font-bold">+91 70055 81380</a></p>
+                    <p>📍 Address: Sector 39, Gurugram, Haryana</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- 1. FIREBASE CONFIGURATION (From your provided code) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXubITvhhUgZF83R9xtSvazQD6wHUfOQs",
+            authDomain: "physiocalender-9cd13.firebaseapp.com",
+            databaseURL: "https://physiocalender-9cd13-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "physiocalender-9cd13",
+            storageBucket: "physiocalender-9cd13.firebasestorage.app",
+            messagingSenderId: "69558259806",
+            appId: "1:69558259806:web:f608d8e3b80afe30b8a4cf",
+            measurementId: "G-352RB24E58"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const dbRef = db.ref('appointments'); 
+
+        // --- 2. CALENDAR LOGIC ---
+        const startHour = 8;
+        const endHour = 20; 
+        let appointments = {}; 
+        let currentMonday = getMonday(new Date());
+
+        let selectedSlotId = null;
+        let selectedTime = null;
+        let selectedPackage = ""; // To store if they clicked "Book Basic" or "Premium"
+
+        const grid = document.getElementById('calendarGrid');
+
+        // Fetch data instantly
+        dbRef.on('value', (snapshot) => {
+            appointments = snapshot.val() || {}; 
+            initCalendar(); 
+        });
+
+        function getMonday(d) {
+            d = new Date(d);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
+
+        function formatDateKey(dateObj) {
+            return dateObj.toISOString().split('T')[0];
+        }
+        
+        function goToToday() {
+            currentMonday = getMonday(new Date());
+            initCalendar();
+        }
+
+        function changeWeek(d) {
+            currentMonday.setDate(currentMonday.getDate() + d);
+            initCalendar();
+        }
+
+        function initCalendar() {
+            grid.innerHTML = "";
+            
+            // Headers
+            const timeHeader = document.createElement('div');
+            timeHeader.className = 'header-cell';
+            timeHeader.innerText = "Time";
+            grid.appendChild(timeHeader);
+
+            const realTodayKey = formatDateKey(new Date());
+
+            for (let i = 0; i < 6; i++) {
+                let d = new Date(currentMonday);
+                d.setDate(currentMonday.getDate() + i);
+                const dateKey = formatDateKey(d);
+                
+                const cell = document.createElement('div');
+                cell.className = 'header-cell';
+                if (dateKey === realTodayKey) cell.classList.add('is-today');
+                
+                const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateNum = d.getDate() + "/" + (d.getMonth() + 1);
+                cell.innerText = `${dayName} ${dateNum}`;
+                grid.appendChild(cell);
+            }
+
+            // Slots
+            for (let hour = startHour; hour <= endHour; hour++) {
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'time-cell';
+                timeLabel.innerText = hour > 12 ? (hour - 12) + " PM" : hour + " AM";
+                grid.appendChild(timeLabel);
+
+                for (let i = 0; i < 6; i++) {
+                    let d = new Date(currentMonday);
+                    d.setDate(currentMonday.getDate() + i);
+                    const dateKey = formatDateKey(d);
+                    const uniqueId = `${dateKey}_${hour}`;
+                    
+                    const slot = document.createElement('div');
+                    
+                    if (appointments[uniqueId]) {
+                        slot.className = 'slot taken';
+                        slot.innerText = "Booked";
+                    } else {
+                        slot.className = 'slot available';
+                        slot.innerText = "Book";
+                        slot.onclick = () => openCalModal(uniqueId, hour, d);
+                    }
+                    
+                    grid.appendChild(slot);
+                }
+            }
+        }
+
+        // --- 3. MODAL LOGIC FOR CALENDAR ---
+        function openCalModal(slotId, hour, dateObj) {
+            selectedSlotId = slotId;
+            
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            const timeStr = hour > 12 ? (hour - 12) + ":00 PM" : hour + ":00 AM";
+            selectedTime = timeStr; 
+
+            document.getElementById('modalTimeText').innerText = `${dayName} at ${timeStr}`;
+            document.getElementById('pName').value = ""; 
+            document.getElementById('pPhone').value = "";
+            
+            document.getElementById('bookingModal').style.display = 'flex';
+        }
+
+        function closeCalModal() {
+            document.getElementById('bookingModal').style.display = 'none';
+        }
+
+        function confirmBooking() {
+            const name = document.getElementById('pName').value;
+            const phone = document.getElementById('pPhone').value;
+
+            if (!name || !phone) {
+                showToast("Please fill in both Name and Phone.");
+                return;
+            }
+
+            const btn = document.querySelector('.btn-confirm');
+            const originalText = btn.innerText;
+            btn.innerText = "Booking...";
+            btn.disabled = true;
+
+            const newAppt = {
+                id: Date.now().toString(),
+                time: selectedTime,
+                name: name,
+                phone: phone,
+                package: selectedPackage || "General" // Save package info if available
+            };
+
+            dbRef.child(selectedSlotId).child(newAppt.id).set(newAppt)
+                .then(() => {
+                    closeCalModal();
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    showToast("✅ Booking Confirmed!");
+                })
+                .catch(e => {
+                    showToast("Error: " + e.message);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                });
+        }
+
+        // --- 4. VIEW SWITCHING & GENERAL LOGIC ---
+        const mainView = document.getElementById('main-view');
+        const bookingPage = document.getElementById('booking-page');
+        const packageNote = document.getElementById('package-note');
+        const packageSpan = document.getElementById('selected-package-name');
+
+        window.openBookingPage = (packageName = null) => {
+            mainView.classList.add('hidden');
+            bookingPage.classList.remove('hidden');
+            window.scrollTo(0, 0);
+
+            if (packageName) {
+                selectedPackage = packageName;
+                packageNote.classList.remove('hidden');
+                packageSpan.textContent = packageName;
+            } else {
+                selectedPackage = "";
+                packageNote.classList.add('hidden');
+            }
+            
+            // Refresh calendar to ensure sizing is correct after being hidden
+            setTimeout(initCalendar, 100);
+        };
+
+        window.closeBookingPage = () => {
+            bookingPage.classList.add('hidden');
+            mainView.classList.remove('hidden');
+        };
+
+        // Toast Helper
+        function showToast(msg) {
+            const x = document.getElementById("toast");
+            x.textContent = msg;
+            x.className = "show";
+            setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+        }
+
+        // --- 5. LEGAL MODALS LOGIC ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('[data-policy]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById(`${btn.getAttribute('data-policy')}-modal`).classList.remove('hidden');
+                });
+            });
+            document.querySelectorAll('[data-close-modal]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.modal').classList.add('hidden');
+                });
+            });
+        });
+
+        // Initialize Calendar on Load
+        initCalendar();
+    </script>
+</body>
+</html>
+
